@@ -85,11 +85,7 @@ O sistema opera em um ciclo contínuo:
 
 - `main.ino`: Arquivo principal com setup e loop
 - `sensors.ino`: Funções para leitura e processamento dos sensores
-- `audio_engine.ino`: Geração de earcons e processamento de áudio
-- `audio_player.ino`: Reprodução de arquivos de áudio pré-gravados
-- `bluetooth_a2dp.ino`: Configuração e gerenciamento da conexão Bluetooth
-- `audio_player.h`: Definições para o player de áudio
-- `audios/`: Pasta com arquivos WAV para alertas por voz
+- `bluetooth.ino`: Configuração e gerenciamento da conexão Bluetooth
 
 ## 🤝 Contribuições
 
@@ -98,10 +94,6 @@ Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou enviar
 ## 📜 Licença
 
 Este projeto está licenciado sob a Licença MIT - veja o arquivo LICENSE para detalhes.
-
-## 📞 Contato
-
-Para mais informações, entre em contato com o desenvolvedor do projeto.
 
 ---
 
