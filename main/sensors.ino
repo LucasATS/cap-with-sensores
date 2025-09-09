@@ -1,96 +1,81 @@
 #include "BluetoothA2DPSource.h"
 extern BluetoothA2DPSource a2dp_source;
 
-void setupSensors()
-{
-  // Configura os pinos dos sensores
+
+extern float altura_pessoa;
+extern float distancia_sensor1;
+extern float distancia_real_sensor2;
+extern int volume_esquerdo, volume_direito;
+extern int frequencia_esquerda, frequencia_direita;
+
+
+void setupSensors() {
   pinMode(TRIG_PIN_1, OUTPUT);
   pinMode(ECHO_PIN_1, INPUT);
   pinMode(TRIG_PIN_2, OUTPUT);
   pinMode(ECHO_PIN_2, INPUT);
 }
 
-float lerSensor1()
-{
-  // Limpa o pino TRIG
-  digitalWrite(TRIG_PIN_1, LOW);
+
+float lerSensor(int trigPin, int echoPin) {
+  digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
 
-  // Envia pulso de 10µs
-  digitalWrite(TRIG_PIN_1, HIGH);
+  digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
-  digitalWrite(TRIG_PIN_1, LOW);
+  digitalWrite(trigPin, LOW);
 
-  // Lê o tempo de retorno do eco
-  float duracao = pulseIn(ECHO_PIN_1, HIGH);
+  long duracao = pulseIn(echoPin, HIGH, 25000UL); // Timeout 25ms (~4m)
+  if (duracao == 0) return -1.0f; // Sem leitura
 
-  // Calcula a distância (velocidade do som: 343m/s)
-  float distancia = (duracao * 0.0343) / 2;
-
-  return distancia;
+  return (duracao * 0.0343f) / 2.0f; // Velocidade do som (cm/us)
 }
 
-float lerSensor2()
-{
-  // Limpa o pino TRIG
-  digitalWrite(TRIG_PIN_2, LOW);
-  delayMicroseconds(2);
+float lerSensor1() { return lerSensor(TRIG_PIN_1, ECHO_PIN_1); }
+float lerSensor2() { return lerSensor(TRIG_PIN_2, ECHO_PIN_2); }
 
-  // Envia pulso de 10µs
-  digitalWrite(TRIG_PIN_2, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN_2, LOW);
 
-  // Lê o tempo de retorno do eco
-  float duracao = pulseIn(ECHO_PIN_2, HIGH);
+float calcularDistanciaReal(float distancia_medida) {
+  if (distancia_medida < 0) return -1;
 
-  // Calcula a distância (velocidade do som: 343m/s)
-  float distancia = (duracao * 0.0343) / 2;
+  // Ajuste para ângulo de 45° usando Pitágoras
+  float distancia_real = distancia_medida / 1.414f; // sqrt(2) ≈ 1.414
 
-  return distancia;
-}
-
-float calcularDistanciaReal(float distancia_medida)
-{
-  // Calcula a distância real considerando o ângulo de 45°
-  // Usando o teorema de Pitágoras para o triângulo retângulo
-  // A hipotenusa é a distância medida pelo sensor
-  // Queremos calcular o cateto adjacente (distância horizontal)
-
-  // Para um ângulo de 45°, os catetos são iguais
-  // Portanto, cateto = hipotenusa / sqrt(2)
-  float distancia_real = distancia_medida / 1.414; // sqrt(2) ≈ 1.414
-
-  // Ajuste baseado na altura da pessoa
-  // Se a distância for muito pequena, pode indicar um obstáculo no chão
-  if (distancia_real < altura_pessoa * 0.3)
-  {
-    // Ajuste para evitar falsos positivos com o chão
-    return (distancia_real > 30.0f) ? distancia_real : 30.0f; // Mínimo de 30cm para evitar alertas constantes
+  // Filtro para evitar falsos positivos com o chão
+  float limite_chao = altura_pessoa * 0.3f * 100.0f; // altura em cm
+  if (distancia_real < limite_chao) {
+    return (distancia_real > 30.0f) ? distancia_real : 30.0f;
   }
-
   return distancia_real;
 }
 
-void calcularParametrosAudio()
-{
-  // Calcula os parâmetros de áudio baseados nas distâncias
-  // Sensor 1 (frente) controla o canal esquerdo
-  // Sensor 2 (baixo) controla o canal direito
 
-  // Limites de distância para alertas
-  const float distancia_maxima = 200.0; // cm
-  const float distancia_minima = 30.0;  // cm
+void calcularParametrosAudio() {
+  const int vol_max = 50;
+  const int vol_min = 10;
+  const int freq_max = 2000; // Hz
+  const int freq_min = 200;  // Hz
 
-  // Limites de frequência
-  const int freq_minima = 200;  // Hz
-  const int freq_maxima = 2000; // Hz
+  const float dist_max_frente = 100.0f; // cm
+  const float dist_max_baixo  = 60.0f;  // cm
+  const float dist_min        = 30.0f;  // cm
 
-  // Mapeia a distância para volume (mais perto = mais alto)
-  volume_esquerdo = map(constrain(distancia_sensor1, distancia_minima, distancia_maxima), distancia_minima, distancia_maxima, 50, 10);
-  volume_direito = map(constrain(distancia_real_sensor2, distancia_minima, distancia_maxima), distancia_minima, distancia_maxima, 50, 10);
+  // Canal esquerdo (frente)
+  if (distancia_sensor1 > 0 && distancia_sensor1 <= dist_max_frente) {
+    volume_esquerdo = map(constrain(distancia_sensor1, dist_min, dist_max_frente), dist_min, dist_max_frente, 50, 10);
+    frequencia_esquerda = map(constrain(distancia_sensor1, dist_min, dist_max_frente), dist_min, dist_max_frente, freq_max, freq_min);
+  } else {
+    volume_esquerdo = 0;
+    frequencia_esquerda = 0;
+  }
 
-  // Mapeia a distância para frequência (mais perto = frequência mais alta)
-  frequencia_esquerda = map(constrain(distancia_sensor1, distancia_minima, distancia_maxima), distancia_minima, distancia_maxima, freq_maxima, freq_minima);
-  frequencia_direita = map(constrain(distancia_real_sensor2, distancia_minima, distancia_maxima), distancia_minima, distancia_maxima, freq_maxima, freq_minima);
+  // Canal direito (baixo)
+  if (distancia_real_sensor2 > 0 && distancia_real_sensor2 <= dist_max_baixo) {
+    volume_direito = map(constrain(distancia_real_sensor2, dist_min, dist_max_baixo), dist_min, dist_max_baixo, 50, 10);
+    frequencia_direita = map(constrain(distancia_real_sensor2, dist_min, dist_max_baixo), dist_min, dist_max_baixo, freq_max, freq_min);
+  } else {
+    volume_direito = 0;
+    frequencia_direita = 0;
+  }
 }
+
